@@ -1,2 +1,5 @@
 images/
 reference/
+outputs/
+/data.db
+/metadata.toml
