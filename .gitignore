@@ -3,3 +3,11 @@ reference/
 outputs/
 /data.db
 /metadata.toml
+/.conda/
+/.nextflow/
+/.nextflow.log*
+/work/
+/results/
+/.pytest_cache/
+**/__pycache__/
+*.egg-info/

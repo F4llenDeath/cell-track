@@ -1,0 +1,33 @@
+input: images/stacked.tif
+outdir: results
+
+basicpy_align_frames: true
+basicpy_upsample_factor: 10
+basicpy_get_darkfield: true
+basicpy_autotune: true
+
+ecc_motion: euclidean
+ecc_background_percentile: 90.0
+rpca_lambda_multiplier: 2.0
+rpca_max_iterations: 80
+rpca_tolerance: 1.0e-7
+
+cellpose_model: cpsam_v2
+cellpose_fallback_model: cpsam
+cellpose_device: auto
+cellpose_diameter: null
+cellpose_flow_threshold: 0.4
+cellpose_cellprob_threshold: 0.0
+cellpose_batch_size: 4
+
+ultrack_contour_sigma: 4.0
+ultrack_min_area: 50
+ultrack_max_area: 20000
+ultrack_max_distance: 80.0
+ultrack_solution_gap: 0.0
+
+qc_frames: [0, 22, 43]
+save_intermediates: false
+save_aligned_stacks: false
+save_normalized_stack: false
+save_ultrack_database: false

@@ -1,12 +1,12 @@
 # Cell Track
 
-This repository contains a notebook-based pipeline for segmenting and tracking cells in 2D darkfield time-lapse microscopy movies acquired on a patterned hydrogel background.
+This repository contains a reproducible Nextflow pipeline and preserved exploratory notebooks for segmenting and tracking cells in 2D darkfield time-lapse microscopy movies acquired on a patterned hydrogel background.
 
 The central difficulty is that cell signal is mixed with a strong structured background pattern that can drift slightly over time. The pipeline therefore combines illumination correction, pattern alignment, low-rank/sparse decomposition, foundation-model segmentation, and global tracking.
 
 ## Pipeline summary
 
-The workflow is split across two notebooks:
+The production workflow is orchestrated by `main.nf` and implemented as shared Python modules under `src/cell_track/`. The original exploratory workflow remains available in two notebooks:
 
 - `basicpy.ipynb` — BaSiCPy illumination correction.
 - `main.ipynb` — ECC alignment, robust PCA background removal, Cellpose-SAM segmentation, and Ultrack tracking.
@@ -27,6 +27,215 @@ Cellpose-SAM segmentation
 Ultrack global tracking
     ↓
 tracks_df.csv + tracked_labels.tif
+```
+
+## Repository layout
+
+```text
+main.nf                       Nextflow entry point
+nextflow.config               defaults, resources, and execution profiles
+modules/local/                one Nextflow process per pipeline stage
+src/cell_track/               shared Python implementation
+src/cell_track/cli/           command-line adapters used by Nextflow
+envs/                         stage-specific Conda environments
+params/example.yml            example pipeline parameters
+tests/                        deterministic unit and integration tests
+basicpy.ipynb                 preserved BaSiCPy exploration notebook
+main.ipynb                    preserved segmentation/tracking notebook
+```
+
+## Quick start with Nextflow
+
+### Requirements
+
+- A POSIX system such as macOS or Linux.
+- Java 17 or later.
+- Nextflow 24.10 or later.
+- Conda, Mamba, or Micromamba for the provided `standard` profile.
+
+Install Nextflow by following the official installation guide:
+
+```text
+https://www.nextflow.io/docs/latest/install.html
+```
+
+### Run one movie
+
+From the repository root:
+
+```bash
+nextflow run main.nf \
+  --input 'images/stacked.tif' \
+  --outdir results \
+  -profile standard \
+  -resume
+```
+
+The `standard` profile creates stage-specific environments from `envs/` and caches them under `.conda/`.
+
+You can also use the example parameter file:
+
+```bash
+nextflow run main.nf \
+  -params-file params/example.yml \
+  -profile standard \
+  -resume
+```
+
+### Run multiple movies
+
+Use a glob as the input:
+
+```bash
+nextflow run main.nf \
+  --input 'data/*.tif' \
+  --outdir results \
+  -profile standard \
+  -resume
+```
+
+Each TIFF basename becomes its sample ID. Input files must therefore have unique basenames after removing `.tif` or `.tiff`.
+
+### Reuse existing local environments
+
+The optional `existing` profile is useful while migrating from the original notebook environments:
+
+```bash
+export CELL_TRACK_BASICPY_ENV="$(conda info --base)/envs/basicpy"
+export CELL_TRACK_ANALYSIS_ENV="$(conda info --base)/envs/ultrack"
+
+nextflow run main.nf \
+  --input 'images/stacked.tif' \
+  --outdir results \
+  -profile existing \
+  -resume
+```
+
+On the current development Mac, the historical `ultrack` environment contains multiple copies of `libomp`. Cellpose may consequently require this environment-only compatibility setting:
+
+```bash
+export KMP_DUPLICATE_LIB_OK=TRUE
+```
+
+This OpenMP setting is not a preferred reproducibility solution; use the isolated `standard` environments for new installations.
+
+### Resume and selective reruns
+
+Nextflow caches each stage. Always use `-resume` when continuing or repeating a run:
+
+```bash
+nextflow run main.nf -params-file params/example.yml -profile standard -resume
+```
+
+Changing an Ultrack parameter reruns Ultrack and QC but reuses BaSiCPy, ECC/RPCA, and Cellpose. Changing a Cellpose parameter reruns Cellpose and downstream stages. Do not delete `work/` if you want to retain resumability.
+
+## Results
+
+Results are organized by sample:
+
+```text
+results/
+├── pipeline_info/
+│   ├── parameters.json
+│   ├── execution_report.html
+│   ├── execution_timeline.html
+│   ├── execution_trace.txt
+│   └── workflow_dag.html
+└── <sample>/
+    ├── preprocessing/
+    │   ├── basicpy_diagnostics/
+    │   └── ecc_rpca_diagnostics/
+    ├── segmentation/
+    │   ├── cellpose_labels.tif
+    │   ├── cell_counts.csv
+    │   └── cellpose_metadata.json
+    ├── tracking/
+    │   ├── tracks_df.csv
+    │   ├── tracked_labels.tif
+    │   ├── cell_areas.csv
+    │   └── tracking_metadata.json
+    └── qc/
+        ├── cells_per_frame.png
+        ├── segmentation_overlays.png
+        ├── track_durations.png
+        ├── tracking_overlays.png
+        └── summary.json
+```
+
+Large corrected TIFF intermediates are retained in Nextflow's `work/` directory for `-resume` but are only copied to `results/` when:
+
+```text
+--save_intermediates true
+```
+
+Other optional outputs are controlled by:
+
+```text
+--save_aligned_stacks true
+--save_normalized_stack true
+--save_ultrack_database true
+```
+
+When tracking databases are requested, one database is saved for each contiguous non-empty time segment under `tracking/ultrack_databases/`.
+
+## Parameters
+
+Defaults are defined in `nextflow.config`, and a complete editable example is provided in `params/example.yml`. Important groups are:
+
+- `basicpy_*` — frame registration, darkfield estimation, and autotuning.
+- `ecc_*` — motion model and ECC convergence.
+- `rpca_*` — sparse penalty, tolerance, and maximum iterations.
+- `cellpose_*` — model, compute device, diameter, thresholds, and batch size.
+- `ultrack_*` — contour smoothing, area filters, linking distance, solver weights, gap, and time limit.
+- `qc_frames` — selected frames for static overlays; accepts a YAML list or comma-separated CLI values.
+
+For example:
+
+```bash
+nextflow run main.nf \
+  --input 'images/stacked.tif' \
+  --cellpose_device mps \
+  --cellpose_flow_threshold 0.4 \
+  --ultrack_max_distance 80 \
+  --qc_frames 0,22,43 \
+  -profile standard \
+  -resume
+```
+
+## Testing
+
+The project uses Python's built-in `unittest` runner. Run BaSiCPy-specific tests in the BaSiCPy environment:
+
+```bash
+PYTHONPATH=src conda run -n basicpy \
+  python -m unittest -v tests.test_common tests.test_basicpy tests.test_cli
+```
+
+Run analysis, Cellpose-adapter, Ultrack, and QC tests in the analysis environment:
+
+```bash
+PYTHONPATH=src conda run -n ultrack \
+  python -m unittest -v \
+  tests.test_common \
+  tests.test_ecc_rpca \
+  tests.test_segmentation \
+  tests.test_tracking \
+  tests.test_qc \
+  tests.test_cli
+```
+
+Validate the workflow without running the analysis:
+
+```bash
+nextflow run main.nf \
+  --input 'images/stacked.tif' \
+  -profile standard \
+  -preview
+
+nextflow run main.nf \
+  --input 'images/stacked.tif' \
+  -profile standard \
+  -stub-run
 ```
 
 ## Method overview

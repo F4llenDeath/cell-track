@@ -1,0 +1,11 @@
+name: cell-track-ultrack
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - higra=0.6.12
+  - pandas
+  - tifffile
+  - pip
+  - pip:
+      - ultrack==0.7.0

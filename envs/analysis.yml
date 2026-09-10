@@ -1,0 +1,13 @@
+name: cell-track-analysis
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy
+  - pandas
+  - matplotlib
+  - tifffile
+  - tqdm
+  - pip
+  - pip:
+      - opencv-python-headless==4.13.0.92
