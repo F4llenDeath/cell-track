@@ -1,4 +1,4 @@
-name: cell-track-cellpose-macos
+name: cell-track-cellpose
 channels:
   - conda-forge
 dependencies:

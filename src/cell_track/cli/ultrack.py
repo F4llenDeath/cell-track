@@ -13,7 +13,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--min-area", type=int, default=50)
     parser.add_argument("--max-area", type=int, default=20_000)
     parser.add_argument("--max-distance", type=float, default=80.0)
-    parser.add_argument("--n-workers", type=int, default=8)
+    parser.add_argument("--n-workers", type=int, default=4)
     parser.add_argument("--appear-weight", type=float, default=-1.0)
     parser.add_argument("--disappear-weight", type=float, default=-1.0)
     parser.add_argument("--division-weight", type=float, default=-0.1)

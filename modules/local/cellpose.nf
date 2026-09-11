@@ -34,7 +34,6 @@ process CELLPOSE {
     """
     # cell-track source hash: ${code_hash}
     export PYTHONPATH="${projectDir}/src:\${PYTHONPATH:-}"
-    KMP_DUPLICATE_LIB_OK="${System.getenv('KMP_DUPLICATE_LIB_OK') ?: 'FALSE'}" \
     python -m cell_track.cli.cellpose \
         --input "${foreground_tif}" \
         --output-dir . \

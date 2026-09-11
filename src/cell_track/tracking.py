@@ -12,13 +12,13 @@ from .common import label_dtype, runtime_metadata, validate_stack, write_json
 
 @dataclass(frozen=True)
 class UltrackConfig:
-    """Ultrack parameters matching the original notebook defaults."""
+    """Ultrack parameters used by the CLI and Nextflow workflow."""
 
     contour_sigma: float = 4.0
     min_area: int = 50
     max_area: int = 20_000
     max_distance: float = 80.0
-    n_workers: int = 8
+    n_workers: int = 4
     appear_weight: float = -1.0
     disappear_weight: float = -1.0
     division_weight: float = -0.1

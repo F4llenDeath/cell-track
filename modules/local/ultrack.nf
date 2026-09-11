@@ -29,6 +29,7 @@ process ULTRACK {
 
     script:
     def database_arg = save_database ? '--save-database' : '--no-save-database'
+    def effective_workers = Math.max(1, Math.min(n_workers as Integer, task.cpus as Integer))
     """
     # cell-track source hash: ${code_hash}
     export PYTHONPATH="${projectDir}/src:\${PYTHONPATH:-}"
@@ -40,7 +41,7 @@ process ULTRACK {
         --min-area ${min_area} \
         --max-area ${max_area} \
         --max-distance ${max_distance} \
-        --n-workers ${n_workers} \
+        --n-workers ${effective_workers} \
         --appear-weight ${appear_weight} \
         --disappear-weight ${disappear_weight} \
         --division-weight ${division_weight} \

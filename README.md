@@ -37,7 +37,7 @@ nextflow.config               defaults, resources, and execution profiles
 modules/local/                one Nextflow process per pipeline stage
 src/cell_track/               shared Python implementation
 src/cell_track/cli/           command-line adapters used by Nextflow
-envs/                         stage-specific Conda environments
+envs/                         runner and stage-specific Conda environments
 params/example.yml            example pipeline parameters
 tests/                        deterministic unit and integration tests
 basicpy.ipynb                 preserved BaSiCPy exploration notebook
@@ -48,16 +48,27 @@ main.ipynb                    preserved segmentation/tracking notebook
 
 ### Requirements
 
-- A POSIX system such as macOS or Linux.
-- Java 17 or later.
-- Nextflow 24.10 or later.
-- Conda, Mamba, or Micromamba for the provided `standard` profile.
+- Apple Silicon macOS or x86-64 Linux.
+- Miniforge (recommended) or another compatible Conda installation.
+- At least 16 GB of RAM is recommended for the current resource settings.
 
-Install Nextflow by following the official installation guide:
+The provided runner environment installs the tested Java and Nextflow versions, so they do not need to be installed separately. From the repository root, create it once:
 
-```text
-https://www.nextflow.io/docs/latest/install.html
+```bash
+conda env create -f envs/runner.yml
+conda activate cell-track-runner
 ```
+
+If `envs/runner.yml` changes later, update the environment with:
+
+```bash
+conda env update \
+  --name cell-track-runner \
+  --file envs/runner.yml \
+  --prune
+```
+
+Experienced users may instead use an existing compatible installation of Java 17+ and Nextflow 24.10+ together with Conda.
 
 ### Run one movie
 
@@ -71,7 +82,13 @@ nextflow run main.nf \
   -resume
 ```
 
-The `standard` profile creates stage-specific environments from `envs/` and caches them under `.conda/`.
+The `standard` profile creates the stage-specific environments from `envs/` and caches them under an OS/architecture-specific subdirectory of `.conda/`. This first environment setup can take time; later runs reuse the cache. The runner environment only supplies Java and Nextflow and remains separate from the scientific environments.
+
+To place the stage-environment cache somewhere else, set `NXF_CONDA_CACHEDIR` before starting Nextflow:
+
+```bash
+export NXF_CONDA_CACHEDIR="$HOME/.cache/cell-track/conda"
+```
 
 You can also use the example parameter file:
 
@@ -96,29 +113,6 @@ nextflow run main.nf \
 
 Each TIFF basename becomes its sample ID. Input files must therefore have unique basenames after removing `.tif` or `.tiff`.
 
-### Reuse existing local environments
-
-The optional `existing` profile is useful while migrating from the original notebook environments:
-
-```bash
-export CELL_TRACK_BASICPY_ENV="$(conda info --base)/envs/basicpy"
-export CELL_TRACK_ANALYSIS_ENV="$(conda info --base)/envs/ultrack"
-
-nextflow run main.nf \
-  --input 'images/stacked.tif' \
-  --outdir results \
-  -profile existing \
-  -resume
-```
-
-On the current development Mac, the historical `ultrack` environment contains multiple copies of `libomp`. Cellpose may consequently require this environment-only compatibility setting:
-
-```bash
-export KMP_DUPLICATE_LIB_OK=TRUE
-```
-
-This OpenMP setting is not a preferred reproducibility solution; use the isolated `standard` environments for new installations.
-
 ### Resume and selective reruns
 
 Nextflow caches each stage. Always use `-resume` when continuing or repeating a run:
@@ -128,6 +122,14 @@ nextflow run main.nf -params-file params/example.yml -profile standard -resume
 ```
 
 Changing an Ultrack parameter reruns Ultrack and QC but reuses BaSiCPy, ECC/RPCA, and Cellpose. Changing a Cellpose parameter reruns Cellpose and downstream stages. Do not delete `work/` if you want to retain resumability.
+
+### Platform and compute notes
+
+The current environment recipes are intended for Apple Silicon macOS and x86-64 Linux. Intel macOS and ARM64 Linux are not currently tested because the pinned PyTorch and Higra binary support differs on those platforms.
+
+`cellpose_device: auto` uses Apple MPS when it is available, CUDA on a compatible Linux setup, and otherwise CPU. You may request a device explicitly with `--cellpose_device mps`, `cuda`, or `cpu`.
+
+The default Ultrack allocation is four CPUs and four workers. The Nextflow process also caps the requested worker count at `task.cpus`, preventing Ultrack from starting more workers than the task was allocated. Use an additional Nextflow config file if a larger workstation should allocate more CPUs.
 
 ## Results
 
@@ -204,24 +206,45 @@ nextflow run main.nf \
 
 ## Testing
 
-The project uses Python's built-in `unittest` runner. Run BaSiCPy-specific tests in the BaSiCPy environment:
+The project uses Python's built-in `unittest` runner. Developers can create the named stage environments directly from the same files used by Nextflow:
 
 ```bash
-PYTHONPATH=src conda run -n basicpy \
+conda env create -f envs/basicpy.yml
+conda env create -f envs/analysis.yml
+conda env create -f envs/cellpose.yml
+conda env create -f envs/ultrack.yml
+```
+
+Run the BaSiCPy tests with:
+
+```bash
+PYTHONPATH=src conda run -n cell-track-basicpy \
   python -m unittest -v tests.test_common tests.test_basicpy tests.test_cli
 ```
 
-Run analysis, Cellpose-adapter, Ultrack, and QC tests in the analysis environment:
+Run the ECC/RPCA and QC tests with:
 
 ```bash
-PYTHONPATH=src conda run -n ultrack \
+PYTHONPATH=src conda run -n cell-track-analysis \
   python -m unittest -v \
   tests.test_common \
   tests.test_ecc_rpca \
-  tests.test_segmentation \
-  tests.test_tracking \
   tests.test_qc \
   tests.test_cli
+```
+
+Run the Cellpose adapter tests with:
+
+```bash
+PYTHONPATH=src conda run -n cell-track-cellpose \
+  python -m unittest -v tests.test_common tests.test_segmentation tests.test_cli
+```
+
+Run the Ultrack tests with:
+
+```bash
+PYTHONPATH=src conda run -n cell-track-ultrack \
+  python -m unittest -v tests.test_common tests.test_tracking tests.test_cli
 ```
 
 Validate the workflow without running the analysis:

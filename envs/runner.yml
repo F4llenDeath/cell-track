@@ -1,0 +1,7 @@
+name: cell-track-runner
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - openjdk=17
+  - nextflow=24.10.6
