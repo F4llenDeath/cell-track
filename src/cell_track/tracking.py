@@ -230,8 +230,8 @@ def run_ultrack(
 
         for old_track, new_track in track_map.items():
             tracked_labels[start : end + 1][local_tracked == old_track] = new_track
-        for parent, children in local_graph.items():
-            graph[track_map[int(parent)]] = [track_map[int(child)] for child in children]
+        for child, parent in local_graph.items():
+            graph[track_map[int(child)]] = track_map[int(parent)]
 
         database_path = segment_dir / main_config.data_config.database_file_name
         metadata_path = Path(main_config.data_config.metadata_path)
