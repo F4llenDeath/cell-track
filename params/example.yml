@@ -25,9 +25,9 @@ ultrack_min_area: 50
 ultrack_max_area: 20000
 ultrack_max_distance: 80.0
 ultrack_n_workers: 4
-ultrack_solution_gap: 0.0
+ultrack_solution_gap: 0.003
 
-qc_frames: [0, 22, 43]
+qc_frames: []
 save_intermediates: false
 save_aligned_stacks: false
 save_normalized_stack: false
